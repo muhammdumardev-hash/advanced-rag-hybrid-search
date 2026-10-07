@@ -237,7 +237,35 @@ section[data-testid="stSidebar"] label { color: #F9FAFB !important; }
 
 /* ---------- Inputs ---------- */
 .stButton > button { border-radius: 10px; font-weight: 700; height: 45px; border: 1px solid #CBD5E1; }
-.stTextInput input { border-radius: 11px; border: 1px solid #CBD5E1; padding: 12px; background: white !important; color: #1E293B !important; }
+/* Text input: white box, dark text in every state (default, focus, typed) */
+.stTextInput [data-baseweb="input"],
+.stTextInput [data-baseweb="base-input"] {
+  background: #FFFFFF !important; border-radius: 11px !important;
+  border: 1px solid #CBD5E1 !important;
+}
+.stTextInput [data-baseweb="input"]:focus-within {
+  border: 1px solid #2563EB !important; box-shadow: 0 0 0 2px rgba(37,99,235,0.15) !important;
+}
+.stTextInput input {
+  background: #FFFFFF !important; color: #0F172A !important;
+  -webkit-text-fill-color: #0F172A !important; caret-color: #2563EB !important;
+  padding: 12px !important; font-size: 15px !important;
+}
+.stTextInput input::placeholder { color: #94A3B8 !important; -webkit-text-fill-color: #94A3B8 !important; opacity: 1 !important; }
+.stTextInput input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #FFFFFF inset !important; -webkit-text-fill-color: #0F172A !important;
+}
+
+/* Tabs: always visible labels, blue when selected */
+.main [data-baseweb="tab-list"] { gap: 6px; border-bottom: 1px solid #E2E8F0; }
+.main button[data-baseweb="tab"] { background: transparent !important; }
+.main button[data-baseweb="tab"] p,
+.main button[data-baseweb="tab"] span,
+.main button[data-baseweb="tab"] div { color: #334155 !important; font-weight: 600 !important; font-size: 14px !important; }
+.main button[data-baseweb="tab"][aria-selected="true"] p,
+.main button[data-baseweb="tab"][aria-selected="true"] span,
+.main button[data-baseweb="tab"][aria-selected="true"] div { color: #2563EB !important; }
+.main button[data-baseweb="tab"]:hover p { color: #1D4ED8 !important; }
 </style>
 """)
 
