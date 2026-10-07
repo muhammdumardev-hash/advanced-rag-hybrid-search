@@ -1,4 +1,5 @@
 import os
+import re
 from html import escape
 
 import streamlit as st
@@ -20,331 +21,57 @@ st.set_page_config(
 )
 
 
+# ============================================================
+# HELPERS
+# ============================================================
+
 def render(content: str):
+    """Strip indentation/blank lines so Streamlit never treats HTML as a code block."""
     cleaned = "\n".join(
         line.strip() for line in content.splitlines() if line.strip()
     )
     st.markdown(cleaned, unsafe_allow_html=True)
 
 
-render("""
-<style>
-.stApp {
-    background: #F5F7FB;
-}
-
-.main .stMarkdown,
-.main .stMarkdown p,
-.main .stMarkdown span,
-.main label,
-.main [data-testid="stMetricLabel"],
-.main [data-testid="stMetricValue"],
-.main [data-testid="stMetricDelta"],
-.main [data-testid="stExpander"] summary,
-.main [data-testid="stExpander"] summary span,
-.main [data-baseweb="tab"] {
-    color: #1E293B !important;
-}
-
-.main [data-testid="stCaptionContainer"] p {
-    color: #64748B !important;
-}
-
-.main [data-testid="stAlert"] {
-    color: #1E293B !important;
-}
-
-.main [data-testid="stExpander"] {
-    color: #1E293B !important;
-}
-
-.main [data-testid="stTextInput"] label {
-    color: #1E293B !important;
-}
-
-section[data-testid="stSidebar"] .stMarkdown,
-section[data-testid="stSidebar"] .stMarkdown p,
-section[data-testid="stSidebar"] label,
-section[data-testid="stSidebar"] [data-baseweb="slider"] * {
-    color: #F9FAFB !important;
-}
-
-.main .block-container {
-    padding-top: 2rem;
-    padding-bottom: 3rem;
-    max-width: 1450px;
-}
-
-section[data-testid="stSidebar"] {
-    background: #111827;
-    border-right: 1px solid #1F2937;
-}
-
-section[data-testid="stSidebar"] * {
-    color: #F9FAFB;
-}
-
-.hero {
-    background: linear-gradient(
-        135deg,
-        #111827 0%,
-        #172554 55%,
-        #1E3A8A 100%
-    );
-    padding: 32px 38px;
-    border-radius: 20px;
-    color: white;
-    margin-bottom: 25px;
-    box-shadow: 0 10px 35px rgba(15,23,42,0.15);
-}
-
-.hero-title {
-    font-size: 34px;
-    font-weight: 800;
-    margin-bottom: 8px;
-    letter-spacing: -0.7px;
-}
-
-.hero-subtitle {
-    font-size: 15px;
-    color: #CBD5E1;
-    line-height: 1.6;
-    max-width: 850px;
-}
-
-.badge {
-    display: inline-block;
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.18);
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-size: 12px;
-    margin-bottom: 15px;
-}
-
-.section-title {
-    font-size: 21px;
-    font-weight: 750;
-    color: #111827;
-    margin-top: 25px;
-    margin-bottom: 5px;
-}
-
-.section-subtitle {
-    font-size: 13px;
-    color: #64748B;
-    margin-bottom: 18px;
-}
-
-.metric-card {
-    background: white;
-    border: 1px solid #E2E8F0;
-    border-radius: 16px;
-    padding: 20px;
-    min-height: 125px;
-    box-shadow: 0 4px 15px rgba(15,23,42,0.04);
-}
-
-.metric-icon {
-    font-size: 22px;
-    margin-bottom: 8px;
-}
-
-.metric-label {
-    color: #64748B;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.metric-value {
-    color: #111827;
-    font-size: 28px;
-    font-weight: 800;
-    margin-top: 4px;
-}
-
-.metric-description {
-    color: #94A3B8;
-    font-size: 11px;
-    margin-top: 3px;
-}
-
-.pipeline-card {
-    background: white;
-    border: 1px solid #E2E8F0;
-    border-radius: 18px;
-    padding: 22px;
-    margin-bottom: 20px;
-    color: #1E293B;
-    line-height: 1.7;
-    box-shadow: 0 4px 15px rgba(15,23,42,0.04);
-}
-
-.pipeline-step {
-    background: white;
-    border: 1px solid #E2E8F0;
-    border-radius: 12px;
-    padding: 15px 10px;
-    text-align: center;
-    min-height: 100px;
-}
-
-.pipeline-icon {
-    font-size: 25px;
-    margin-bottom: 5px;
-}
-
-.pipeline-name {
-    font-size: 12px;
-    font-weight: 700;
-    color: #1E293B;
-}
-
-.pipeline-desc {
-    font-size: 10px;
-    color: #64748B;
-    margin-top: 3px;
-}
-
-.document-card {
-    background: white;
-    border: 1px solid #E2E8F0;
-    border-radius: 14px;
-    padding: 17px;
-    margin-bottom: 12px;
-}
-
-.document-name {
-    font-size: 14px;
-    font-weight: 700;
-    color: #1E293B;
-}
-
-.document-meta {
-    font-size: 11px;
-    color: #64748B;
-    margin-top: 5px;
-}
-
-.answer-card {
-    background: white;
-    border: 1px solid #DCE3ED;
-    border-radius: 18px;
-    padding: 25px;
-    box-shadow: 0 5px 20px rgba(15,23,42,0.05);
-}
-
-.answer-label {
-    font-size: 12px;
-    font-weight: 700;
-    color: #2563EB;
-    text-transform: uppercase;
-    letter-spacing: 0.7px;
-    margin-bottom: 10px;
-}
-
-.answer-text {
-    color: #1E293B;
-    font-size: 15px;
-    line-height: 1.75;
-    white-space: pre-wrap;
-}
-
-.empty-state {
-    background: white;
-    border: 1px solid #E2E8F0;
-    border-radius: 18px;
-    padding: 45px;
-    text-align: center;
-    margin-top: 25px;
-}
-
-.empty-title {
-    font-size: 20px;
-    font-weight: 750;
-    color: #1E293B;
-    margin-top: 10px;
-}
-
-.empty-text {
-    font-size: 13px;
-    color: #64748B;
-    max-width: 600px;
-    margin: 10px auto 0 auto;
-    line-height: 1.7;
-}
-
-.stButton > button {
-    border-radius: 10px;
-    font-weight: 700;
-    height: 45px;
-    border: 1px solid #CBD5E1;
-}
-
-.stTextInput input {
-    border-radius: 11px;
-    border: 1px solid #CBD5E1;
-    padding: 12px;
-}
-
-.footer {
-    text-align: center;
-    color: #94A3B8;
-    font-size: 11px;
-    padding-top: 35px;
-    padding-bottom: 10px;
-}
-
-.result-card {
-    background: white;
-    border: 1px solid #E2E8F0;
-    border-radius: 14px;
-    padding: 16px;
-    margin-bottom: 12px;
-}
-
-.result-source {
-    font-size: 12px;
-    font-weight: 700;
-    color: #2563EB;
-    margin-bottom: 7px;
-}
-
-.result-score {
-    font-size: 11px;
-    color: #64748B;
-    margin-bottom: 9px;
-}
-
-.result-text {
-    font-size: 13px;
-    color: #1E293B;
-    line-height: 1.65;
-}
-</style>
-""")
+def clean_text(text: str) -> str:
+    """Remove spaced-out PDF header noise like 'P a r t i c i p a n t s'."""
+    text = re.sub(r"(?<!\S)(?:\S ){6,}\S(?!\S)", "", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
-@st.cache_resource(show_spinner="Loading documents, embeddings and reranker...")
-def build_rag():
-    documents = load_pdf_documents()
-    chunks = chunk_documents(documents)
+def md_to_html(text: str) -> str:
+    """Convert the LLM's simple markdown (bold, bullets) into safe HTML."""
+    blocks = []
+    for raw in text.splitlines():
+        if not raw.strip():
+            continue
 
-    semantic = SemanticSearch(chunks)
-    keyword = KeywordSearch(chunks)
-    reranker = Reranker()
+        indent = min(len(raw) - len(raw.lstrip()), 8)
+        line = escape(raw.strip())
 
-    return documents, chunks, semantic, keyword, reranker
+        bullet = re.match(r"^[-*•]\s+(.*)", line)
+        heading = re.match(r"^#{1,6}\s+(.*)", line)
+
+        if bullet:
+            body = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", bullet.group(1))
+            blocks.append(
+                f'<div class="ans-li" style="margin-left:{indent * 5}px">'
+                f'<span class="ans-dot">●</span><span>{body}</span></div>'
+            )
+        elif heading:
+            body = re.sub(r"\*\*(.+?)\*\*", r"\1", heading.group(1))
+            blocks.append(f'<div class="ans-h">{body}</div>')
+        else:
+            body = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", line)
+            blocks.append(f'<div class="ans-p">{body}</div>')
+
+    return "".join(blocks)
 
 
 def get_file_size(file_name):
     path = os.path.join("knowledge_base", file_name)
-
     if not os.path.exists(path):
         return "0 MB"
-
     return f"{os.path.getsize(path) / (1024 * 1024):.2f} MB"
 
 
@@ -366,89 +93,197 @@ def metric_card(icon, label, value, description):
     """)
 
 
-def result_card(result, score_name, score_value):
+def stat_card(label, value, description):
+    render(f"""
+    <div class="stat-card">
+    <div class="stat-label">{label}</div>
+    <div class="stat-value">{value}</div>
+    <div class="stat-desc">{description}</div>
+    </div>
+    """)
+
+
+def result_card(result, score_name, score_value, rank=None, extra=""):
     source = escape(str(result.get("source", "unknown")))
-    page = result.get("page", "N/A")
-    text = escape(str(result.get("text", "")))
+    page = escape(str(result.get("page", "N/A")))
+    text = escape(clean_text(str(result.get("text", ""))))
     score = float(score_value)
+
+    rank_badge = f'<span class="rank-badge">#{rank}</span>' if rank else ""
+    extra_html = f'<div class="result-extra">{escape(extra)}</div>' if extra else ""
 
     render(f"""
     <div class="result-card">
-    <div class="result-source">
-        📄 {source} &nbsp;•&nbsp; Page {page}
+    <div class="result-top">
+    <div class="result-source">{rank_badge} 📄 {source} &nbsp;•&nbsp; Page {page}</div>
+    <div class="score-pill">{escape(score_name)}: {score:.4f}</div>
     </div>
-
-    <div class="result-score">
-        {escape(score_name)}: {score:.4f}
-    </div>
-
-    <div class="result-text">
-        {text}
-    </div>
+    {extra_html}
+    <div class="result-text">{text}</div>
     </div>
     """)
+
+
+def answer_card(label, answer):
+    render(f"""
+    <div class="answer-card">
+    <div class="answer-label">{label}</div>
+    <div class="answer-body">{md_to_html(answer)}</div>
+    </div>
+    """)
+
+
+# ============================================================
+# CSS
+# ============================================================
+
+render("""
+<style>
+/* ---------- Base ---------- */
+.stApp { background: #F5F7FB; }
+.main .block-container { padding-top: 2rem; padding-bottom: 3rem; max-width: 1450px; }
+
+/* ---------- Force readable text in main area ---------- */
+.main h1, .main h2, .main h3, .main h4, .main h5,
+.main p, .main li, .main strong, .main label,
+.main [data-testid="stMetricLabel"] *,
+.main [data-testid="stMetricValue"] *,
+.main [data-testid="stExpander"] summary *,
+.main [data-baseweb="tab"] *,
+.main [data-testid="stAlert"] * { color: #1E293B !important; }
+
+.main [data-testid="stCaptionContainer"] * { color: #64748B !important; }
+.main [data-testid="stMetricDelta"] * { color: #64748B !important; }
+
+.main [data-testid="stExpander"] {
+  background: white; border: 1px solid #E2E8F0 !important; border-radius: 12px;
+}
+.main [data-baseweb="tab-highlight"] { background-color: #2563EB !important; }
+.main [data-testid="stMetric"] {
+  background: white; border: 1px solid #E2E8F0; border-radius: 14px; padding: 14px 16px;
+}
+
+/* ---------- Sidebar ---------- */
+section[data-testid="stSidebar"] { background: #111827; border-right: 1px solid #1F2937; }
+section[data-testid="stSidebar"] *,
+section[data-testid="stSidebar"] .stMarkdown p,
+section[data-testid="stSidebar"] label { color: #F9FAFB !important; }
+
+/* ---------- Hero ---------- */
+.hero { background: linear-gradient(135deg, #111827 0%, #172554 55%, #1E3A8A 100%);
+  padding: 32px 38px; border-radius: 20px; margin-bottom: 25px;
+  box-shadow: 0 10px 35px rgba(15,23,42,0.15); }
+.hero .hero-title { font-size: 34px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.7px; color: white !important; }
+.hero .hero-subtitle { font-size: 15px; color: #CBD5E1 !important; line-height: 1.6; max-width: 850px; }
+.hero .badge { display: inline-block; background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.18); padding: 6px 12px; border-radius: 999px;
+  font-size: 12px; margin-bottom: 15px; color: white !important; }
+
+/* ---------- Sections ---------- */
+.section-title { font-size: 21px; font-weight: 750; color: #111827; margin-top: 28px; margin-bottom: 5px; }
+.section-subtitle { font-size: 13px; color: #64748B; margin-bottom: 18px; }
+
+/* ---------- Cards ---------- */
+.metric-card { background: white; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px;
+  min-height: 125px; box-shadow: 0 4px 15px rgba(15,23,42,0.04); }
+.metric-icon { font-size: 22px; margin-bottom: 8px; }
+.metric-label { color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.metric-value { color: #111827; font-size: 28px; font-weight: 800; margin-top: 4px; }
+.metric-description { color: #94A3B8; font-size: 11px; margin-top: 3px; }
+
+.stat-card { background: white; border: 1px solid #E2E8F0; border-radius: 14px; padding: 16px 18px;
+  box-shadow: 0 4px 15px rgba(15,23,42,0.04); }
+.stat-label { color: #64748B; font-size: 12px; font-weight: 600; }
+.stat-value { color: #111827; font-size: 28px; font-weight: 800; margin: 2px 0; }
+.stat-desc { color: #2563EB; font-size: 11px; font-weight: 600; }
+
+.pipeline-step { background: white; border: 1px solid #E2E8F0; border-radius: 12px;
+  padding: 15px 10px; text-align: center; min-height: 100px; }
+.pipeline-icon { font-size: 25px; margin-bottom: 5px; }
+.pipeline-name { font-size: 12px; font-weight: 700; color: #1E293B; }
+.pipeline-desc { font-size: 10px; color: #64748B; margin-top: 3px; }
+
+.document-card { background: white; border: 1px solid #E2E8F0; border-radius: 14px; padding: 17px; margin-bottom: 12px; }
+.document-name { font-size: 14px; font-weight: 700; color: #1E293B; }
+.document-meta { font-size: 11px; color: #64748B; margin-top: 5px; }
+
+/* ---------- Result cards ---------- */
+.result-card { background: white; border: 1px solid #E2E8F0; border-left: 4px solid #2563EB;
+  border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; box-shadow: 0 2px 10px rgba(15,23,42,0.04); }
+.result-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.result-source { font-size: 13px; font-weight: 700; color: #1E293B; }
+.rank-badge { background: #2563EB; color: white; border-radius: 6px; padding: 2px 8px; font-size: 11px; margin-right: 6px; }
+.score-pill { background: #EFF6FF; color: #1D4ED8; border-radius: 999px; padding: 4px 11px; font-size: 11px; font-weight: 700; }
+.result-extra { font-size: 11px; color: #64748B; margin-bottom: 8px; }
+.result-text { font-size: 13px; color: #334155; line-height: 1.7; }
+
+/* ---------- Answer ---------- */
+.answer-card { background: white; border: 1px solid #DCE3ED; border-radius: 18px; padding: 25px 28px;
+  box-shadow: 0 5px 20px rgba(15,23,42,0.05); }
+.answer-label { font-size: 12px; font-weight: 700; color: #2563EB; text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 12px; }
+.answer-text { color: #1E293B; font-size: 15px; line-height: 1.75; }
+.answer-body { color: #1E293B; font-size: 15px; line-height: 1.7; }
+.ans-p { margin: 6px 0; color: #1E293B; }
+.ans-h { margin: 10px 0 4px 0; font-weight: 700; color: #111827; }
+.ans-li { display: flex; gap: 10px; margin: 8px 0; color: #1E293B; }
+.ans-dot { color: #2563EB; font-size: 9px; margin-top: 8px; flex-shrink: 0; }
+.ans-li b, .ans-p b { color: #111827; }
+
+/* ---------- Empty / footer ---------- */
+.empty-state { background: white; border: 1px solid #E2E8F0; border-radius: 18px; padding: 45px; text-align: center; margin-top: 25px; }
+.empty-title { font-size: 20px; font-weight: 750; color: #1E293B; margin-top: 10px; }
+.empty-text { font-size: 13px; color: #64748B; max-width: 600px; margin: 10px auto 0 auto; line-height: 1.7; }
+.footer { text-align: center; color: #94A3B8; font-size: 11px; padding-top: 35px; padding-bottom: 10px; }
+
+/* ---------- Inputs ---------- */
+.stButton > button { border-radius: 10px; font-weight: 700; height: 45px; border: 1px solid #CBD5E1; }
+.stTextInput input { border-radius: 11px; border: 1px solid #CBD5E1; padding: 12px; background: white !important; color: #1E293B !important; }
+</style>
+""")
+
+
+# ============================================================
+# RAG BUILD
+# ============================================================
+
+@st.cache_resource(show_spinner="Loading documents, embeddings and reranker...")
+def build_rag():
+    documents = load_pdf_documents()
+    chunks = chunk_documents(documents)
+
+    semantic = SemanticSearch(chunks)
+    keyword = KeywordSearch(chunks)
+    reranker = Reranker()
+
+    return documents, chunks, semantic, keyword, reranker
 
 
 st.session_state.setdefault("search_performed", False)
 st.session_state.setdefault("rag_result", None)
 
 
-with st.sidebar:
+# ============================================================
+# SIDEBAR
+# ============================================================
 
+with st.sidebar:
     render("""
     <div style="padding: 10px 4px 20px 4px;">
-        <div style="font-size: 27px; font-weight: 800;">
-            📚 RAG Intelligence
-        </div>
-
-        <div style="
-            font-size: 12px;
-            color: #94A3B8;
-            margin-top: 6px;
-        ">
-            Advanced Document Q&A
-        </div>
+    <div style="font-size: 27px; font-weight: 800;">📚 RAG Intelligence</div>
+    <div style="font-size: 12px; color: #94A3B8; margin-top: 6px;">Advanced Document Q&amp;A</div>
     </div>
     """)
 
     st.markdown("---")
-
     st.markdown("### ⚙️ Retrieval Settings")
 
-    semantic_weight = st.slider(
-        "Semantic Search Weight",
-        0.0,
-        1.0,
-        0.60,
-        0.05
-    )
-
-    keyword_weight = st.slider(
-        "Keyword Search Weight",
-        0.0,
-        1.0,
-        0.40,
-        0.05
-    )
-
-    top_k = st.slider(
-        "Hybrid Results",
-        3,
-        20,
-        10
-    )
-
-    rerank_k = st.slider(
-        "Final Reranked Results",
-        1,
-        10,
-        3
-    )
+    semantic_weight = st.slider("Semantic Search Weight", 0.0, 1.0, 0.60, 0.05)
+    keyword_weight = st.slider("Keyword Search Weight", 0.0, 1.0, 0.40, 0.05)
+    top_k = st.slider("Hybrid Results", 3, 20, 10)
+    rerank_k = st.slider("Final Reranked Results", 1, 10, 3)
 
     st.markdown("---")
-
     st.markdown("### 🧠 Search Strategy")
-
     st.markdown(
         "**Semantic Search** — meaning and context.\n\n"
         "**Keyword Search** — exact terms, names, numbers.\n\n"
@@ -457,135 +292,71 @@ with st.sidebar:
     )
 
     st.markdown("---")
-
     st.caption("Advanced RAG • Internship Project")
 
 
+# ============================================================
+# HERO
+# ============================================================
+
 render("""
 <div class="hero">
-
-<div class="badge">
-⚡ ADVANCED RETRIEVAL-AUGMENTED GENERATION
-</div>
-
-<div class="hero-title">
-Intelligent Document Q&A
-</div>
-
+<div class="badge">⚡ ADVANCED RETRIEVAL-AUGMENTED GENERATION</div>
+<div class="hero-title">Intelligent Document Q&amp;A</div>
 <div class="hero-subtitle">
 Ask questions from your document knowledge base using semantic search,
 keyword retrieval, hybrid search and cross-encoder reranking before
 generating an AI-powered answer.
 </div>
-
 </div>
 """)
 
 
-try:
+# ============================================================
+# KNOWLEDGE BASE
+# ============================================================
 
+try:
     documents, chunks, semantic, keyword, reranker = build_rag()
     load_error = None
-
 except Exception as error:
-
-    documents = []
-    chunks = []
-    semantic = None
-    keyword = None
-    reranker = None
+    documents, chunks, semantic, keyword, reranker = [], [], None, None, None
     load_error = str(error)
 
-
-section(
-    "📊 Knowledge Base Overview",
-    "Documents currently available for retrieval."
-)
-
+section("📊 Knowledge Base Overview", "Documents currently available for retrieval.")
 
 c1, c2, c3, c4 = st.columns(4)
-
-
 with c1:
-    metric_card(
-        "📄",
-        "Documents",
-        len(documents),
-        "PDF knowledge sources"
-    )
-
-
+    metric_card("📄", "Documents", len(documents), "PDF knowledge sources")
 with c2:
-    metric_card(
-        "🧩",
-        "Chunks",
-        len(chunks),
-        "Indexed text segments"
-    )
-
-
+    metric_card("🧩", "Chunks", len(chunks), "Indexed text segments")
 with c3:
-    metric_card(
-        "🎯",
-        "Reranking",
-        "Active" if reranker else "Unavailable",
-        "Cross-Encoder"
-    )
-
-
+    metric_card("🎯", "Reranking", "Active" if reranker else "Unavailable", "Cross-Encoder")
 with c4:
-    metric_card(
-        "🤖",
-        "Generation",
-        "Groq",
-        "Context-grounded answers"
-    )
+    metric_card("🤖", "Generation", "Groq", "Context-grounded answers")
 
-
-with st.expander(
-    "📚 View Knowledge Base Documents",
-    expanded=False
-):
-
+with st.expander("📚 View Knowledge Base Documents", expanded=False):
     if documents:
-
         cols = st.columns(2)
-
         for i, document in enumerate(documents):
-
             with cols[i % 2]:
-
                 name = escape(document["source"])
                 pages = len(document.get("pages", []))
-
                 render(f"""
                 <div class="document-card">
-
-                <div class="document-name">
-                    📄 {name}
-                </div>
-
-                <div class="document-meta">
-                    PDF &nbsp;•&nbsp;
-                    {pages} pages &nbsp;•&nbsp;
-                    {get_file_size(document["source"])}
-                </div>
-
+                <div class="document-name">📄 {name}</div>
+                <div class="document-meta">PDF &nbsp;•&nbsp; {pages} pages &nbsp;•&nbsp; {get_file_size(document["source"])}</div>
                 </div>
                 """)
-
     else:
-
-        st.warning(
-            "No PDF documents were loaded from the knowledge_base folder."
-        )
+        st.warning("No PDF documents were loaded from the knowledge_base folder.")
 
 
-section(
-    "🔄 Retrieval Pipeline",
-    "Every question passes through the following retrieval stages."
-)
+# ============================================================
+# PIPELINE
+# ============================================================
 
+section("🔄 Retrieval Pipeline", "Every question passes through the following retrieval stages.")
 
 pipeline = [
     ("📄", "Documents", "Knowledge Base"),
@@ -597,38 +368,22 @@ pipeline = [
     ("🤖", "LLM", "Final Answer"),
 ]
 
-
-for col, (icon, name, desc) in zip(
-    st.columns(len(pipeline)),
-    pipeline
-):
-
+for col, (icon, name, desc) in zip(st.columns(len(pipeline)), pipeline):
     with col:
-
         render(f"""
         <div class="pipeline-step">
-
-        <div class="pipeline-icon">
-            {icon}
-        </div>
-
-        <div class="pipeline-name">
-            {name}
-        </div>
-
-        <div class="pipeline-desc">
-            {desc}
-        </div>
-
+        <div class="pipeline-icon">{icon}</div>
+        <div class="pipeline-name">{name}</div>
+        <div class="pipeline-desc">{desc}</div>
         </div>
         """)
 
 
-section(
-    "💬 Ask Your Documents",
-    "Ask a question and retrieve the most relevant information from the knowledge base."
-)
+# ============================================================
+# QUESTION AREA
+# ============================================================
 
+section("💬 Ask Your Documents", "Ask a question and retrieve the most relevant information from the knowledge base.")
 
 query = st.text_input(
     "Your question",
@@ -636,65 +391,27 @@ query = st.text_input(
     label_visibility="collapsed",
 )
 
-
 b1, b2, _ = st.columns([1, 1, 4])
-
-
 with b1:
-
-    search_button = st.button(
-        "🔎 Search Documents",
-        use_container_width=True,
-        type="primary"
-    )
-
-
+    search_button = st.button("🔎 Search Documents", use_container_width=True, type="primary")
 with b2:
-
-    clear_button = st.button(
-        "✕ Clear",
-        use_container_width=True
-    )
-
+    clear_button = st.button("✕ Clear", use_container_width=True)
 
 if clear_button:
-
     st.session_state.search_performed = False
     st.session_state.rag_result = None
     st.rerun()
 
-
 if search_button:
-
     if not query.strip():
-
         st.warning("Please enter a question first.")
-
     elif load_error:
-
-        st.error(
-            f"RAG pipeline could not start: {load_error}"
-        )
-
+        st.error(f"RAG pipeline could not start: {load_error}")
     else:
-
-        with st.spinner(
-            "Running semantic search → keyword search → "
-            "hybrid search → reranking → LLM..."
-        ):
-
+        with st.spinner("Running semantic → keyword → hybrid → reranking → LLM..."):
             try:
-
-                semantic_results = semantic.search(
-                    query,
-                    top_k=top_k
-                )
-
-                keyword_results = keyword.search(
-                    query,
-                    top_k=top_k
-                )
-
+                semantic_results = semantic.search(query, top_k=top_k)
+                keyword_results = keyword.search(query, top_k=top_k)
 
                 hybrid_results = hybrid_search(
                     semantic_results,
@@ -704,19 +421,8 @@ if search_button:
                     keyword_weight=keyword_weight,
                 )
 
-
-                reranked_results = reranker.rerank(
-                    query,
-                    hybrid_results,
-                    top_k=rerank_k,
-                )
-
-
-                answer = generate_answer(
-                    query,
-                    reranked_results
-                )
-
+                reranked_results = reranker.rerank(query, hybrid_results, top_k=rerank_k)
+                answer = generate_answer(query, reranked_results)
 
                 st.session_state.rag_result = {
                     "query": query,
@@ -726,302 +432,118 @@ if search_button:
                     "reranked": reranked_results,
                     "answer": answer,
                 }
-
                 st.session_state.search_performed = True
 
-
             except Exception as error:
-
                 st.session_state.rag_result = None
+                st.error(f"Search failed: {error}")
 
-                st.error(
-                    f"Search failed: {error}"
-                )
 
+# ============================================================
+# RESULTS
+# ============================================================
 
 result = st.session_state.rag_result
 
-
 if st.session_state.search_performed and result:
 
-    # OUT-OF-SCOPE / INFORMATION NOT AVAILABLE
+    # ---------- Out of scope ----------
     if result["answer"].strip() == FALLBACK:
+        section("🤖 AI Answer", "No supporting information was found in the document knowledge base.")
+        answer_card("Information Not Available", result["answer"])
 
-        section(
-            "🤖 AI Answer",
-            "No supporting information was found in the document knowledge base."
-        )
-
-        render(f"""
-        <div class="answer-card">
-
-        <div class="answer-label">
-            Information Not Available
-        </div>
-
-        <div class="answer-text">
-            {escape(result["answer"])}
-        </div>
-
-        </div>
-        """)
-
-
-    # NORMAL SUCCESSFUL ANSWER
+    # ---------- Normal answer ----------
     else:
+        # 1) Final answer first (most important)
+        section("🤖 AI Answer", "Generated using only the final reranked document context.")
+        answer_card("Context-Grounded Response", result["answer"])
 
-        section(
-            "🔍 Retrieval Analysis",
-            "Actual retrieval results from the current query."
-        )
-
+        # 2) Query + stats
+        section("🔍 Retrieval Analysis", "Actual retrieval results from the current query.")
 
         render(f"""
         <div class="answer-card">
-
-        <div class="answer-label">
-            User Query
-        </div>
-
-        <div class="answer-text">
-            {escape(result["query"])}
-        </div>
-
+        <div class="answer-label">User Query</div>
+        <div class="answer-text">{escape(result["query"])}</div>
         </div>
         """)
-
 
         st.write("")
 
-
         m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            stat_card("Semantic Candidates", len(result["semantic"]), "Vector Search")
+        with m2:
+            stat_card("Keyword Candidates", len(result["keyword"]), "BM25")
+        with m3:
+            stat_card("Hybrid Candidates", len(result["hybrid"]), "Combined")
+        with m4:
+            stat_card("Reranked Results", len(result["reranked"]), "Final Context")
 
-
-        m1.metric(
-            "Semantic Candidates",
-            len(result["semantic"]),
-            "Vector Search"
-        )
-
-
-        m2.metric(
-            "Keyword Candidates",
-            len(result["keyword"]),
-            "BM25"
-        )
-
-
-        m3.metric(
-            "Hybrid Candidates",
-            len(result["hybrid"]),
-            "Combined"
-        )
-
-
-        m4.metric(
-            "Reranked Results",
-            len(result["reranked"]),
-            "Final Context"
-        )
-
+        st.write("")
 
         tab1, tab2, tab3 = st.tabs(
-            [
-                "🧠 Semantic Search",
-                "🔤 Keyword Search",
-                "🔀 Hybrid + Reranking"
-            ]
+            ["🧠 Semantic Search", "🔤 Keyword Search", "🔀 Hybrid Search"]
         )
-
 
         with tab1:
-
             st.markdown("### Semantic Retrieval")
-
             if result["semantic"]:
-
-                for item in result["semantic"]:
-
-                    result_card(
-                        item,
-                        "Semantic Score",
-                        item.get("semantic_score", 0.0)
-                    )
-
+                for rank, item in enumerate(result["semantic"], start=1):
+                    result_card(item, "Semantic", item.get("semantic_score", 0.0), rank=rank)
             else:
-
-                st.info(
-                    "No semantic candidates found."
-                )
-
+                st.info("No semantic candidates found.")
 
         with tab2:
-
             st.markdown("### Keyword Retrieval")
-
             if result["keyword"]:
-
-                for item in result["keyword"]:
-
-                    result_card(
-                        item,
-                        "BM25 Score",
-                        item.get("keyword_score", 0.0)
-                    )
-
+                for rank, item in enumerate(result["keyword"], start=1):
+                    result_card(item, "BM25", item.get("keyword_score", 0.0), rank=rank)
             else:
-
-                st.info(
-                    "No keyword candidates found."
-                )
-
+                st.info("No keyword candidates found.")
 
         with tab3:
-
             st.markdown("### Hybrid Search")
-
-            st.caption(
-                "Semantic + BM25 candidates combined using the selected weights."
-            )
-
+            st.caption("Semantic + BM25 candidates combined using the selected weights.")
             if result["hybrid"]:
-
-                for rank, item in enumerate(
-                    result["hybrid"],
-                    start=1
-                ):
-
-                    st.markdown(
-                        f"**Rank {rank}**"
-                    )
-
+                for rank, item in enumerate(result["hybrid"], start=1):
                     result_card(
                         item,
-                        "Hybrid Score",
-                        item.get("hybrid_score", 0.0)
+                        "Hybrid",
+                        item.get("hybrid_score", 0.0),
+                        rank=rank,
+                        extra=(
+                            f"Semantic: {item.get('semantic_score', 0.0):.4f}  |  "
+                            f"BM25: {item.get('keyword_score', 0.0):.4f}"
+                        ),
                     )
-
             else:
+                st.info("No hybrid candidates found.")
 
-                st.info(
-                    "No hybrid candidates found."
-                )
-
-
-        section(
-            "📑 Retrieved Results",
-            "Top hybrid candidates passed to the reranker."
-        )
-
-
-        if result["hybrid"]:
-
-            for rank, item in enumerate(
-                result["hybrid"],
-                start=1
-            ):
-
-                with st.expander(
-                    f"Candidate {rank} — "
-                    f"{item.get('source', 'unknown')} | "
-                    f"Hybrid: "
-                    f"{item.get('hybrid_score', 0.0):.4f}"
-                ):
-
-                    st.write(
-                        item.get("text", "")
-                    )
-
-                    st.caption(
-                        f"Semantic: "
-                        f"{item.get('semantic_score', 0.0):.4f} | "
-                        f"BM25: "
-                        f"{item.get('keyword_score', 0.0):.4f} | "
-                        f"Page: "
-                        f"{item.get('page', 'N/A')}"
-                    )
-
-        else:
-
-            st.info(
-                "No retrieved candidates were found."
-            )
-
-
-        section(
-            "🎯 Reranking Results",
-            "Cross-Encoder scores each question/chunk pair and keeps the highest-ranked context."
-        )
-
+        # 3) Reranking
+        section("🎯 Reranking Results", "Cross-Encoder scores each question/chunk pair and keeps the highest-ranked context.")
 
         if result["reranked"]:
-
-            for rank, item in enumerate(
-                result["reranked"],
-                start=1
-            ):
-
-                result_card(
-                    item,
-                    f"Rerank Score • Rank {rank}",
-                    item.get("rerank_score", 0.0)
-                )
-
+            for rank, item in enumerate(result["reranked"], start=1):
+                result_card(item, "Rerank", item.get("rerank_score", 0.0), rank=rank)
         else:
-
-            st.info(
-                "No reranked results were produced."
-            )
-
-
-        section(
-            "🤖 AI Answer",
-            "Generated using only the final reranked document context."
-        )
-
-
-        render(f"""
-        <div class="answer-card">
-
-        <div class="answer-label">
-            Context-Grounded Response
-        </div>
-
-        <div class="answer-text">
-            {escape(result["answer"])}
-        </div>
-
-        </div>
-        """)
-
+            st.info("No reranked results were produced.")
 
 else:
-
     render("""
     <div class="empty-state">
-
-    <div style="font-size:45px;">
-        🔎
-    </div>
-
-    <div class="empty-title">
-        Ready to Search
-    </div>
-
+    <div style="font-size:45px;">🔎</div>
+    <div class="empty-title">Ready to Search</div>
     <div class="empty-text">
-        Enter a question above to start the Advanced RAG pipeline.
-        Your query will pass through semantic search, keyword search,
-        hybrid retrieval and reranking before generating the final answer.
+    Enter a question above to start the Advanced RAG pipeline. Your query will pass through
+    semantic search, keyword search, hybrid retrieval and reranking before generating the final answer.
     </div>
-
     </div>
     """)
 
 
 render("""
 <div class="footer">
-Advanced RAG with Hybrid Search &amp; Reranking
-&nbsp;•&nbsp;
-Document Intelligence System
+Advanced RAG with Hybrid Search &amp; Reranking &nbsp;•&nbsp; Document Intelligence System
 </div>
 """)
