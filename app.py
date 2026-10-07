@@ -9,7 +9,7 @@ from src.semantic_search import SemanticSearch
 from src.keyword_search import KeywordSearch
 from src.hybrid_search import hybrid_search
 from src.reranker import Reranker
-from src.qa import generate_answer
+from src.qa import generate_answer, FALLBACK
 
 
 st.set_page_config(
@@ -30,6 +30,21 @@ def render(content: str):
 render("""
 <style>
 .stApp { background: #F5F7FB; }
+.main .stMarkdown, .main .stMarkdown p, .main .stMarkdown span,
+.main label, .main [data-testid="stMetricLabel"],
+.main [data-testid="stMetricValue"], .main [data-testid="stMetricDelta"],
+.main [data-testid="stExpander"] summary, .main [data-testid="stExpander"] summary span,
+.main [data-baseweb="tab"] { color: #1E293B !important; }
+.main [data-testid="stCaptionContainer"] p { color: #64748B !important; }
+.main [data-testid="stAlert"] { color: #1E293B !important; }
+.main [data-testid="stExpander"] { color: #1E293B !important; }
+.main [data-testid="stTextInput"] label { color: #1E293B !important; }
+section[data-testid="stSidebar"] .stMarkdown,
+section[data-testid="stSidebar"] .stMarkdown p,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] [data-baseweb="slider"] * {
+    color: #F9FAFB !important;
+}
 .main .block-container { padding-top: 2rem; padding-bottom: 3rem; max-width: 1450px; }
 section[data-testid="stSidebar"] { background: #111827; border-right: 1px solid #1F2937; }
 section[data-testid="stSidebar"] * { color: #F9FAFB; }
@@ -295,85 +310,94 @@ if search_button:
 result = st.session_state.rag_result
 
 if st.session_state.search_performed and result:
-    section("🔍 Retrieval Analysis", "Actual retrieval results from the current query.")
 
-    render(f"""
-    <div class="answer-card">
-    <div class="answer-label">User Query</div>
-    <div class="answer-text">{escape(result["query"])}</div>
-    </div>
-    """)
+    if result["answer"].strip() == FALLBACK:
+        section("🤖 AI Answer", "No supporting information was found in the document knowledge base.")
+        render(f"""
+        <div class="answer-card">
+        <div class="answer-label">Information Not Available</div>
+        <div class="answer-text">{escape(result["answer"])}</div>
+        </div>
+        """)
+    else:        section("🔍 Retrieval Analysis", "Actual retrieval results from the current query.")
 
-    st.write("")
+        render(f"""
+        <div class="answer-card">
+        <div class="answer-label">User Query</div>
+        <div class="answer-text">{escape(result["query"])}</div>
+        </div>
+        """)
 
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Semantic Candidates", len(result["semantic"]), "Vector Search")
-    m2.metric("Keyword Candidates", len(result["keyword"]), "BM25")
-    m3.metric("Hybrid Candidates", len(result["hybrid"]), "Combined")
-    m4.metric("Reranked Results", len(result["reranked"]), "Final Context")
+        st.write("")
 
-    tab1, tab2, tab3 = st.tabs(
-        ["🧠 Semantic Search", "🔤 Keyword Search", "🔀 Hybrid + Reranking"]
-    )
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Semantic Candidates", len(result["semantic"]), "Vector Search")
+        m2.metric("Keyword Candidates", len(result["keyword"]), "BM25")
+        m3.metric("Hybrid Candidates", len(result["hybrid"]), "Combined")
+        m4.metric("Reranked Results", len(result["reranked"]), "Final Context")
 
-    with tab1:
-        st.markdown("### Semantic Retrieval")
-        if result["semantic"]:
-            for item in result["semantic"]:
-                result_card(item, "Semantic Score", item.get("semantic_score", 0.0))
-        else:
-            st.info("No semantic candidates found.")
+        tab1, tab2, tab3 = st.tabs(
+            ["🧠 Semantic Search", "🔤 Keyword Search", "🔀 Hybrid + Reranking"]
+        )
 
-    with tab2:
-        st.markdown("### Keyword Retrieval")
-        if result["keyword"]:
-            for item in result["keyword"]:
-                result_card(item, "BM25 Score", item.get("keyword_score", 0.0))
-        else:
-            st.info("No keyword candidates found.")
+        with tab1:
+            st.markdown("### Semantic Retrieval")
+            if result["semantic"]:
+                for item in result["semantic"]:
+                    result_card(item, "Semantic Score", item.get("semantic_score", 0.0))
+            else:
+                st.info("No semantic candidates found.")
 
-    with tab3:
-        st.markdown("### Hybrid Search")
-        st.caption("Semantic + BM25 candidates combined using the selected weights.")
+        with tab2:
+            st.markdown("### Keyword Retrieval")
+            if result["keyword"]:
+                for item in result["keyword"]:
+                    result_card(item, "BM25 Score", item.get("keyword_score", 0.0))
+            else:
+                st.info("No keyword candidates found.")
+
+        with tab3:
+            st.markdown("### Hybrid Search")
+            st.caption("Semantic + BM25 candidates combined using the selected weights.")
+            if result["hybrid"]:
+                for rank, item in enumerate(result["hybrid"], start=1):
+                    st.markdown(f"**Rank {rank}**")
+                    result_card(item, "Hybrid Score", item.get("hybrid_score", 0.0))
+            else:
+                st.info("No hybrid candidates found.")
+
+        section("📑 Retrieved Results", "Top hybrid candidates passed to the reranker.")
+
         if result["hybrid"]:
             for rank, item in enumerate(result["hybrid"], start=1):
-                st.markdown(f"**Rank {rank}**")
-                result_card(item, "Hybrid Score", item.get("hybrid_score", 0.0))
+                with st.expander(
+                    f"Candidate {rank} — {item.get('source', 'unknown')} | Hybrid: {item.get('hybrid_score', 0.0):.4f}"
+                ):
+                    st.write(item.get("text", ""))
+                    st.caption(
+                        f"Semantic: {item.get('semantic_score', 0.0):.4f} | "
+                        f"BM25: {item.get('keyword_score', 0.0):.4f} | "
+                        f"Page: {item.get('page', 'N/A')}"
+                    )
         else:
-            st.info("No hybrid candidates found.")
+            st.info("No retrieved candidates were found.")
 
-    section("📑 Retrieved Results", "Top hybrid candidates passed to the reranker.")
+        section("🎯 Reranking Results", "Cross-Encoder scores each question/chunk pair and keeps the highest-ranked context.")
 
-    if result["hybrid"]:
-        for rank, item in enumerate(result["hybrid"], start=1):
-            with st.expander(
-                f"Candidate {rank} — {item.get('source', 'unknown')} | Hybrid: {item.get('hybrid_score', 0.0):.4f}"
-            ):
-                st.write(item.get("text", ""))
-                st.caption(
-                    f"Semantic: {item.get('semantic_score', 0.0):.4f} | "
-                    f"BM25: {item.get('keyword_score', 0.0):.4f} | "
-                    f"Page: {item.get('page', 'N/A')}"
-                )
-    else:
-        st.info("No retrieved candidates were found.")
+        if result["reranked"]:
+            for rank, item in enumerate(result["reranked"], start=1):
+                result_card(item, f"Rerank Score • Rank {rank}", item.get("rerank_score", 0.0))
+        else:
+            st.info("No reranked results were produced.")
 
-    section("🎯 Reranking Results", "Cross-Encoder scores each question/chunk pair and keeps the highest-ranked context.")
+        section("🤖 AI Answer", "Generated using only the final reranked document context.")
 
-    if result["reranked"]:
-        for rank, item in enumerate(result["reranked"], start=1):
-            result_card(item, f"Rerank Score • Rank {rank}", item.get("rerank_score", 0.0))
-    else:
-        st.info("No reranked results were produced.")
-
-    section("🤖 AI Answer", "Generated using only the final reranked document context.")
-
-    render(f"""
-    <div class="answer-card">
-    <div class="answer-label">Context-Grounded Response</div>
-    <div class="answer-text">{escape(result["answer"])}</div>
-    </div>
-    """)
+        render(f"""
+        <div class="answer-card">
+        <div class="answer-label">Context-Grounded Response</div>
+        <div class="answer-text">{escape(result["answer"])}</div>
+        </div>
+        """)
 
 else:
     render("""
