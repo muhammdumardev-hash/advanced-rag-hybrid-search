@@ -3,9 +3,14 @@ from html import escape
 
 import streamlit as st
 
-# ============================================================
-# PAGE CONFIG
-# ============================================================
+from src.document_loader import load_pdf_documents
+from src.chunking import chunk_documents
+from src.semantic_search import SemanticSearch
+from src.keyword_search import KeywordSearch
+from src.hybrid_search import hybrid_search
+from src.reranker import Reranker
+from src.qa import generate_answer
+
 
 st.set_page_config(
     page_title="Advanced RAG | Document Intelligence",
@@ -15,12 +20,6 @@ st.set_page_config(
 )
 
 
-# ============================================================
-# HTML RENDER HELPER (main fix)
-# Streamlit treats lines indented by 4+ spaces as code blocks.
-# This strips indentation + blank lines so HTML always renders.
-# ============================================================
-
 def render(content: str):
     cleaned = "\n".join(
         line.strip() for line in content.splitlines() if line.strip()
@@ -28,77 +27,58 @@ def render(content: str):
     st.markdown(cleaned, unsafe_allow_html=True)
 
 
-# ============================================================
-# CSS
-# ============================================================
-
 render("""
 <style>
 .stApp { background: #F5F7FB; }
 .main .block-container { padding-top: 2rem; padding-bottom: 3rem; max-width: 1450px; }
-
 section[data-testid="stSidebar"] { background: #111827; border-right: 1px solid #1F2937; }
 section[data-testid="stSidebar"] * { color: #F9FAFB; }
-
-.hero { background: linear-gradient(135deg, #111827 0%, #172554 55%, #1E3A8A 100%);
-  padding: 32px 38px; border-radius: 20px; color: white; margin-bottom: 25px;
-  box-shadow: 0 10px 35px rgba(15,23,42,0.15); }
+.hero { background: linear-gradient(135deg, #111827 0%, #172554 55%, #1E3A8A 100%); padding: 32px 38px; border-radius: 20px; color: white; margin-bottom: 25px; box-shadow: 0 10px 35px rgba(15,23,42,0.15); }
 .hero-title { font-size: 34px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.7px; }
 .hero-subtitle { font-size: 15px; color: #CBD5E1; line-height: 1.6; max-width: 850px; }
-.badge { display: inline-block; background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.18); padding: 6px 12px; border-radius: 999px;
-  font-size: 12px; margin-bottom: 15px; }
-
+.badge { display: inline-block; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); padding: 6px 12px; border-radius: 999px; font-size: 12px; margin-bottom: 15px; }
 .section-title { font-size: 21px; font-weight: 750; color: #111827; margin-top: 25px; margin-bottom: 5px; }
 .section-subtitle { font-size: 13px; color: #64748B; margin-bottom: 18px; }
-
-.metric-card { background: white; border: 1px solid #E2E8F0; border-radius: 16px;
-  padding: 20px; min-height: 125px; box-shadow: 0 4px 15px rgba(15,23,42,0.04); }
+.metric-card { background: white; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px; min-height: 125px; box-shadow: 0 4px 15px rgba(15,23,42,0.04); }
 .metric-icon { font-size: 22px; margin-bottom: 8px; }
 .metric-label { color: #64748B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 .metric-value { color: #111827; font-size: 28px; font-weight: 800; margin-top: 4px; }
 .metric-description { color: #94A3B8; font-size: 11px; margin-top: 3px; }
-
-.pipeline-card { background: white; border: 1px solid #E2E8F0; border-radius: 18px;
-  padding: 22px; margin-bottom: 20px; color: #1E293B; line-height: 1.7;
-  box-shadow: 0 4px 15px rgba(15,23,42,0.04); }
-.pipeline-step { background: white; border: 1px solid #E2E8F0; border-radius: 12px;
-  padding: 15px 10px; text-align: center; min-height: 100px; }
+.pipeline-card { background: white; border: 1px solid #E2E8F0; border-radius: 18px; padding: 22px; margin-bottom: 20px; color: #1E293B; line-height: 1.7; box-shadow: 0 4px 15px rgba(15,23,42,0.04); }
+.pipeline-step { background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 15px 10px; text-align: center; min-height: 100px; }
 .pipeline-icon { font-size: 25px; margin-bottom: 5px; }
 .pipeline-name { font-size: 12px; font-weight: 700; color: #1E293B; }
 .pipeline-desc { font-size: 10px; color: #64748B; margin-top: 3px; }
-
 .document-card { background: white; border: 1px solid #E2E8F0; border-radius: 14px; padding: 17px; margin-bottom: 12px; }
 .document-name { font-size: 14px; font-weight: 700; color: #1E293B; }
 .document-meta { font-size: 11px; color: #64748B; margin-top: 5px; }
-
-.answer-card { background: white; border: 1px solid #DCE3ED; border-radius: 18px;
-  padding: 25px; box-shadow: 0 5px 20px rgba(15,23,42,0.05); }
+.answer-card { background: white; border: 1px solid #DCE3ED; border-radius: 18px; padding: 25px; box-shadow: 0 5px 20px rgba(15,23,42,0.05); }
 .answer-label { font-size: 12px; font-weight: 700; color: #2563EB; text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 10px; }
-.answer-text { color: #1E293B; font-size: 15px; line-height: 1.75; }
-
-.empty-state { background: white; border: 1px solid #E2E8F0; border-radius: 18px;
-  padding: 45px; text-align: center; margin-top: 25px; }
+.answer-text { color: #1E293B; font-size: 15px; line-height: 1.75; white-space: pre-wrap; }
+.empty-state { background: white; border: 1px solid #E2E8F0; border-radius: 18px; padding: 45px; text-align: center; margin-top: 25px; }
 .empty-title { font-size: 20px; font-weight: 750; color: #1E293B; margin-top: 10px; }
 .empty-text { font-size: 13px; color: #64748B; max-width: 600px; margin: 10px auto 0 auto; line-height: 1.7; }
-
 .stButton > button { border-radius: 10px; font-weight: 700; height: 45px; border: 1px solid #CBD5E1; }
 .stTextInput input { border-radius: 11px; border: 1px solid #CBD5E1; padding: 12px; }
-
 .footer { text-align: center; color: #94A3B8; font-size: 11px; padding-top: 35px; padding-bottom: 10px; }
+.result-card { background: white; border: 1px solid #E2E8F0; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+.result-source { font-size: 12px; font-weight: 700; color: #2563EB; margin-bottom: 7px; }
+.result-score { font-size: 11px; color: #64748B; margin-bottom: 9px; }
+.result-text { font-size: 13px; color: #1E293B; line-height: 1.65; }
 </style>
 """)
 
 
-# ============================================================
-# HELPERS
-# ============================================================
+@st.cache_resource(show_spinner="Loading documents, embeddings and reranker...")
+def build_rag():
+    documents = load_pdf_documents()
+    chunks = chunk_documents(documents)
 
-def get_documents():
-    folder = "knowledge_base"
-    if not os.path.exists(folder):
-        return []
-    return sorted(f for f in os.listdir(folder) if f.lower().endswith(".pdf"))
+    semantic = SemanticSearch(chunks)
+    keyword = KeywordSearch(chunks)
+    reranker = Reranker()
+
+    return documents, chunks, semantic, keyword, reranker
 
 
 def get_file_size(file_name):
@@ -126,17 +106,24 @@ def metric_card(icon, label, value, description):
     """)
 
 
-# ============================================================
-# SESSION STATE
-# ============================================================
+def result_card(result, score_name, score_value):
+    source = escape(str(result.get("source", "unknown")))
+    page = result.get("page", "N/A")
+    text = escape(str(result.get("text", "")))
+    score = float(score_value)
 
-st.session_state.setdefault("query", "")
+    render(f"""
+    <div class="result-card">
+    <div class="result-source">📄 {source} &nbsp;•&nbsp; Page {page}</div>
+    <div class="result-score">{escape(score_name)}: {score:.4f}</div>
+    <div class="result-text">{text}</div>
+    </div>
+    """)
+
+
 st.session_state.setdefault("search_performed", False)
+st.session_state.setdefault("rag_result", None)
 
-
-# ============================================================
-# SIDEBAR
-# ============================================================
 
 with st.sidebar:
     render("""
@@ -145,7 +132,6 @@ with st.sidebar:
     <div style="font-size: 12px; color: #94A3B8; margin-top: 6px;">Advanced Document Q&A</div>
     </div>
     """)
-
     st.markdown("---")
     st.markdown("### ⚙️ Retrieval Settings")
 
@@ -162,14 +148,9 @@ with st.sidebar:
         "**Hybrid Search** — combines both.\n\n"
         "**Reranking** — Cross-Encoder re-scores chunks."
     )
-
     st.markdown("---")
     st.caption("Advanced RAG • Internship Project")
 
-
-# ============================================================
-# HERO
-# ============================================================
 
 render("""
 <div class="hero">
@@ -184,11 +165,13 @@ generating an AI-powered answer.
 """)
 
 
-# ============================================================
-# KNOWLEDGE BASE OVERVIEW
-# ============================================================
+try:
+    documents, chunks, semantic, keyword, reranker = build_rag()
+    load_error = None
+except Exception as error:
+    documents, chunks, semantic, keyword, reranker = [], [], None, None, None
+    load_error = str(error)
 
-documents = get_documents()
 
 section("📊 Knowledge Base Overview", "Documents currently available for retrieval.")
 
@@ -196,31 +179,29 @@ c1, c2, c3, c4 = st.columns(4)
 with c1:
     metric_card("📄", "Documents", len(documents), "PDF knowledge sources")
 with c2:
-    metric_card("🔎", "Retrieval", "Hybrid", "Semantic + Keyword")
+    metric_card("🧩", "Chunks", len(chunks), "Indexed text segments")
 with c3:
-    metric_card("🎯", "Reranking", "Active", "Cross-Encoder")
+    metric_card("🎯", "Reranking", "Active" if reranker else "Unavailable", "Cross-Encoder")
 with c4:
-    metric_card("🤖", "Generation", "LLM", "Context-grounded answers")
+    metric_card("🤖", "Generation", "Groq", "Context-grounded answers")
 
 
 with st.expander("📚 View Knowledge Base Documents", expanded=False):
     if documents:
         cols = st.columns(2)
-        for i, doc in enumerate(documents):
+        for i, document in enumerate(documents):
             with cols[i % 2]:
+                name = escape(document["source"])
+                pages = len(document.get("pages", []))
                 render(f"""
                 <div class="document-card">
-                <div class="document-name">📄 {escape(doc)}</div>
-                <div class="document-meta">PDF Document &nbsp;•&nbsp; {get_file_size(doc)}</div>
+                <div class="document-name">📄 {name}</div>
+                <div class="document-meta">PDF &nbsp;•&nbsp; {pages} pages &nbsp;•&nbsp; {get_file_size(document["source"])}</div>
                 </div>
                 """)
     else:
-        st.warning("No PDF documents found in the knowledge_base folder.")
+        st.warning("No PDF documents were loaded from the knowledge_base folder.")
 
-
-# ============================================================
-# PIPELINE
-# ============================================================
 
 section("🔄 Retrieval Pipeline", "Every question passes through the following retrieval stages.")
 
@@ -245,10 +226,6 @@ for col, (icon, name, desc) in zip(st.columns(len(pipeline)), pipeline):
         """)
 
 
-# ============================================================
-# QUESTION AREA
-# ============================================================
-
 section("💬 Ask Your Documents", "Ask a question and retrieve the most relevant information from the knowledge base.")
 
 query = st.text_input(
@@ -263,42 +240,77 @@ with b1:
 with b2:
     clear_button = st.button("✕ Clear", use_container_width=True)
 
+
 if clear_button:
-    st.session_state.query = ""
     st.session_state.search_performed = False
+    st.session_state.rag_result = None
     st.rerun()
+
 
 if search_button:
     if not query.strip():
         st.warning("Please enter a question first.")
+    elif load_error:
+        st.error(f"RAG pipeline could not start: {load_error}")
     else:
-        st.session_state.query = query
-        st.session_state.search_performed = True
+        with st.spinner("Running semantic search → keyword search → hybrid search → reranking → LLM..."):
+            try:
+                semantic_results = semantic.search(query, top_k=top_k)
+                keyword_results = keyword.search(query, top_k=top_k)
+
+                hybrid_results = hybrid_search(
+                    semantic_results,
+                    keyword_results,
+                    top_k=top_k,
+                    semantic_weight=semantic_weight,
+                    keyword_weight=keyword_weight,
+                )
+
+                reranked_results = reranker.rerank(
+                    query,
+                    hybrid_results,
+                    top_k=rerank_k,
+                )
+
+                answer = generate_answer(
+                    query,
+                    reranked_results,
+                )
+
+                st.session_state.rag_result = {
+                    "query": query,
+                    "semantic": semantic_results,
+                    "keyword": keyword_results,
+                    "hybrid": hybrid_results,
+                    "reranked": reranked_results,
+                    "answer": answer,
+                }
+                st.session_state.search_performed = True
+
+            except Exception as error:
+                st.session_state.rag_result = None
+                st.error(f"Search failed: {error}")
 
 
-# ============================================================
-# RESULTS
-# ============================================================
+result = st.session_state.rag_result
 
-if st.session_state.search_performed:
-    current_query = escape(st.session_state.query)
-
-    section("🔍 Retrieval Analysis", "Overview of the retrieval run for your question.")
+if st.session_state.search_performed and result:
+    section("🔍 Retrieval Analysis", "Actual retrieval results from the current query.")
 
     render(f"""
     <div class="answer-card">
     <div class="answer-label">User Query</div>
-    <div class="answer-text">{current_query}</div>
+    <div class="answer-text">{escape(result["query"])}</div>
     </div>
     """)
 
     st.write("")
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Semantic Candidates", "—", "Vector Search")
-    m2.metric("Keyword Candidates", "—", "BM25")
-    m3.metric("Hybrid Candidates", str(top_k), "Retrieved")
-    m4.metric("Reranked Results", str(rerank_k), "Final Context")
+    m1.metric("Semantic Candidates", len(result["semantic"]), "Vector Search")
+    m2.metric("Keyword Candidates", len(result["keyword"]), "BM25")
+    m3.metric("Hybrid Candidates", len(result["hybrid"]), "Combined")
+    m4.metric("Reranked Results", len(result["reranked"]), "Final Context")
 
     tab1, tab2, tab3 = st.tabs(
         ["🧠 Semantic Search", "🔤 Keyword Search", "🔀 Hybrid + Reranking"]
@@ -306,39 +318,60 @@ if st.session_state.search_performed:
 
     with tab1:
         st.markdown("### Semantic Retrieval")
-        st.info("Semantic search will retrieve chunks based on meaning using vector embeddings.")
-        st.caption("Backend integration: src/semantic_search.py")
+        if result["semantic"]:
+            for item in result["semantic"]:
+                result_card(item, "Semantic Score", item.get("semantic_score", 0.0))
+        else:
+            st.info("No semantic candidates found.")
 
     with tab2:
         st.markdown("### Keyword Retrieval")
-        st.info("BM25 keyword search will identify chunks containing important terms from the query.")
-        st.caption("Backend integration: src/keyword_search.py")
+        if result["keyword"]:
+            for item in result["keyword"]:
+                result_card(item, "BM25 Score", item.get("keyword_score", 0.0))
+        else:
+            st.info("No keyword candidates found.")
 
     with tab3:
-        st.markdown("### Hybrid Search → Reranking")
-        render("""
-        <div class="pipeline-card">
-        <b>Step 1 — Hybrid Retrieval</b><br>Semantic and keyword results are combined.<br><br>
-        <b>Step 2 — Candidate Selection</b><br>The highest-quality candidate chunks are selected.<br><br>
-        <b>Step 3 — Cross-Encoder Reranking</b><br>Each question/chunk pair receives a relevance score.<br><br>
-        <b>Step 4 — Final Context</b><br>Only the highest-ranked chunks are passed to the LLM.
-        </div>
-        """)
+        st.markdown("### Hybrid Search")
+        st.caption("Semantic + BM25 candidates combined using the selected weights.")
+        if result["hybrid"]:
+            for rank, item in enumerate(result["hybrid"], start=1):
+                st.markdown(f"**Rank {rank}**")
+                result_card(item, "Hybrid Score", item.get("hybrid_score", 0.0))
+        else:
+            st.info("No hybrid candidates found.")
 
-    section("📑 Retrieved Results", "Candidate chunks selected before final answer generation.")
-    st.info("Actual retrieved chunks will appear here after the retrieval modules are connected.")
+    section("📑 Retrieved Results", "Top hybrid candidates passed to the reranker.")
 
-    section("🎯 Reranking Results", "Cross-Encoder relevance scoring and final context selection.")
-    st.info("The reranker will score each retrieved question/chunk pair and sort the results by relevance.")
+    if result["hybrid"]:
+        for rank, item in enumerate(result["hybrid"], start=1):
+            with st.expander(
+                f"Candidate {rank} — {item.get('source', 'unknown')} | Hybrid: {item.get('hybrid_score', 0.0):.4f}"
+            ):
+                st.write(item.get("text", ""))
+                st.caption(
+                    f"Semantic: {item.get('semantic_score', 0.0):.4f} | "
+                    f"BM25: {item.get('keyword_score', 0.0):.4f} | "
+                    f"Page: {item.get('page', 'N/A')}"
+                )
+    else:
+        st.info("No retrieved candidates were found.")
 
-    section("🤖 AI Answer", "Generated from the top reranked chunks.")
-    render("""
+    section("🎯 Reranking Results", "Cross-Encoder scores each question/chunk pair and keeps the highest-ranked context.")
+
+    if result["reranked"]:
+        for rank, item in enumerate(result["reranked"], start=1):
+            result_card(item, f"Rerank Score • Rank {rank}", item.get("rerank_score", 0.0))
+    else:
+        st.info("No reranked results were produced.")
+
+    section("🤖 AI Answer", "Generated using only the final reranked document context.")
+
+    render(f"""
     <div class="answer-card">
     <div class="answer-label">Context-Grounded Response</div>
-    <div class="answer-text">
-    The final AI-generated answer will appear here after the hybrid retrieval,
-    reranking and LLM modules are connected.
-    </div>
+    <div class="answer-text">{escape(result["answer"])}</div>
     </div>
     """)
 
@@ -355,10 +388,6 @@ else:
     </div>
     """)
 
-
-# ============================================================
-# FOOTER
-# ============================================================
 
 render("""
 <div class="footer">
