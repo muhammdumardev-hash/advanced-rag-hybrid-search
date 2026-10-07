@@ -319,7 +319,8 @@ if st.session_state.search_performed and result:
         <div class="answer-text">{escape(result["answer"])}</div>
         </div>
         """)
-    else:        section("🔍 Retrieval Analysis", "Actual retrieval results from the current query.")
+    else:
+        section("🔍 Retrieval Analysis", "Actual retrieval results from the current query.")
 
         render(f"""
         <div class="answer-card">
